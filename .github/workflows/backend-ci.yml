@@ -59,7 +59,7 @@ jobs:
       - name: Debug message
         if: env.DEBUG == 'true'
         run: echo "Debugging is enabled."
-backend-build-job:
+  backend-build-job:
     runs-on: ubuntu-latest
     needs: [backend-lint-job, backend-test-job] #dependent job
     steps:

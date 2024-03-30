@@ -1,0 +1,169 @@
+# Workflow name
+name: Backend Continuous Deployment
+
+# Triggers for the workflow
+on:
+  # Manual trigger using the workflow_dispatch event
+  workflow_dispatch:
+
+  # Automatic trigger on push events to the main branch
+
+  push_request:
+    branches: 
+      - main
+
+env:
+    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+    AWS_REGION: ${{ secrets.AWS_REGION }}
+   
+
+# Jobs defined in the workflow
+jobs:
+  backend-lint-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: latest
+      - uses: actions/checkout@v3
+      - uses: actions/cache/restore@v3
+        id: cache
+        with:
+          path: path/to/dependencies
+          key: ${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}    
+      - name: Install dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+      - run: cd backend && npm ci
+        # Run the linter.
+      - run: cd backend && npm run lint
+      - name: Debug message
+        if: env.DEBUG == 'true'
+        run: echo "Debugging is enabled."
+    backend-test-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node.js 
+        uses: actions/setup-node@v4
+        with:
+          node-version: latest
+      - uses: actions/checkout@v3
+      - uses: actions/cache/restore@v3
+        id: cache
+        with:
+          path: path/to/dependencies
+          key: ${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}    
+      - name: Install dependencies
+        if: steps.cache.outputs.cache-hit != 'true'    
+      # Run the tests.
+      - name: Run tests
+        run: cd backend && npm test
+      - name: Debug message
+        if: env.DEBUG == 'true'
+        run: echo "Debugging is enabled."
+  backend-build-job:
+    runs-on: ubuntu-latest
+    needs: [backend-lint-job, backend-test-job] #dependent job
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up Node.js 
+        uses: actions/setup-node@v3
+        with:
+          node-version: latest
+      - uses: actions/checkout@v3
+      - uses: actions/cache/restore@v3
+        id: cache
+        with:
+          path: path/to/dependencies
+          key: ${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}    
+      - name: Install dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+      - run: cd backend && npm ci      
+      # Run the tests.
+      - name: Run tests
+        run: cd backend && npm test
+      - name: Debug message
+        if: env.DEBUG == 'true'
+        run: echo "Debugging is enabled."
+        
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - uses: actions/checkout@v3
+      - name: Set environment variable
+        run: |
+          SHORT_SHA_COMMIT=$(git rev-parse --short HEAD)
+          echo CONTAINER_FE_RELEASE_IMAGE=${{ steps.login-ecr.outputs.registry }}/backend:${SHORT_SHA_COMMIT} >> $GITHUB_ENV
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        run: |
+          echo "Get backend external ip address"
+          aws eks update-kubeconfig --name cluster
+          export EXTERNALIP=$(kubectl get svc backend -o=jsonpath='{.status.loadBalancer.ingress[0].hostname}{"\n"}{.status.loadBalancer.ingress[0].ip}')
+          echo $EXTERNALIP
+          echo "Build a docker container and push it to ECR"
+          docker build -t ${CONTAINER_FE_RELEASE_IMAGE} --build-arg=REACT_APP_MOVIE_API_URL=http://$EXTERNALIP .
+          echo "List Docker images"
+          docker images
+
+      - name: Cache Docker image
+        uses: actions/cache@v3
+        with:
+          path: ~/docker-cache
+          key: docker-${{ github.sha }}-backend
+          restore-keys: |
+            docker-${{ github.sha }}-
+
+  backend-deploy:
+    runs-on: ubuntu-latest
+    needs: [backend-build-job]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - uses: actions/checkout@v3
+      - name: Set environment variable
+        run: |
+          SHORT_SHA_COMMIT=$(git rev-parse --short HEAD)
+          echo CONTAINER_FE_RELEASE_IMAGE=${{ steps.login-ecr.outputs.registry }}/backend:${SHORT_SHA_COMMIT} >> $GITHUB_ENV
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name cluster
+
+      - name: Run init.sh
+        run:  |
+          ./init.sh || true
+        working-directory: ./setup
+
+      - name: Set Docker image in Kustomize
+        run: |
+          kustomize edit set image backend=${CONTAINER_FE_RELEASE_IMAGE}
+        working-directory: ./backend/k8s
+
+      - name: Apply Kubernetes resources
+        run: |
+          kustomize build | kubectl apply -f -
+        working-directory: ./backend/k8s

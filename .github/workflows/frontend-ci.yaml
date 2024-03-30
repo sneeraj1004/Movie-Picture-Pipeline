@@ -42,13 +42,13 @@ jobs:
     
      # Install the dependencies.
     - name: Install dependencies
-        run: |
-          npm ci
+      run: |
+        npm ci
 
       # Run the linter.
     - name: Run lint
-        run: |
-          npm run lint
+      run: |
+        npm run lint
 
   frontend-test-job:
     runs-on: ubuntu-latest

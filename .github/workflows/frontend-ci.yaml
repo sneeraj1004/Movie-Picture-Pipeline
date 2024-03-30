@@ -20,7 +20,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '16.14'
+          node-version: latest
 
       - name: Cache node modules
         id: cache-npm
@@ -34,7 +34,7 @@ jobs:
             ${{ runner.os }}-build-${{ env.cache-name }}-
             ${{ runner.os }}-build-
             ${{ runner.os }}-
-      - if: ${{ steps.cache-yarn.outputs.cache-hit != 'true' }}
+      - if: ${{ steps.cache.outputs.cache-hit != 'true' }}
         name: List the state of node modules
         continue-on-error: true
         run: npm list
@@ -57,7 +57,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '16.14'
+          node-version: latest
 
       - name: Cache node modules
         id: cache-npm

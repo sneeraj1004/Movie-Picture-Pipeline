@@ -1,4 +1,4 @@
-name: Frontend Continuous Integration
+name: Frontend-Continuous-Integration
 on:
   pull_request:
     branches:
@@ -8,23 +8,23 @@ on:
   workflow_dispatch:   
 
 jobs:
-  lint:
+  frontend-lint-job:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./frontend
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: latest
 
       - name: Cache node modules
         id: cache-npm
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         env:
           cache-name: cache-node-modules
         with:
@@ -52,7 +52,7 @@ jobs:
       - name: Run lint
         run: |
           npm run lint
-  test:
+  frontend-test-job:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -89,9 +89,9 @@ jobs:
       - name: Run tests
         run: |
           npm test
-  build:
+  frontend-build-job:
     runs-on: ubuntu-latest
-    needs: [lint,test]
+    needs: [frontend-lint-job,frontend-test-job]
     defaults:
       run:
         working-directory: ./frontend

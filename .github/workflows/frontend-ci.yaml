@@ -22,12 +22,22 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: latest
-      - name: cache restore
-        uses: actions/cache/restore@v3
-        id: cache
+      - name: Cache node modules
+        id: cache-npm
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-node-modules
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}    
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+      - if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+        name: List the state of node modules
+        continue-on-error: true
+        run: npm list   
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
       - run: cd frontend && npm ci
@@ -45,12 +55,22 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: latest
-      - uses: actions/checkout@v3
-      - uses: actions/cache/restore@v3
-        id: cache
+      - name: Cache node modules
+        id: cache-npm
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-node-modules
         with:
-          path: path/to/dependencies
-          key: ${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}    
+          path: ~/.npm
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+      - if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+        name: List the state of node modules
+        continue-on-error: true
+        run: npm list}    
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'    
       # Run the tests.
@@ -69,12 +89,22 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: latest
-      - uses: actions/checkout@v3
-      - uses: actions/cache/restore@v3
-        id: cache
+      - name: Cache node modules
+        id: cache-npm
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-node-modules
         with:
-          path: path/to/dependencies
-          key: ${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}    
+          path: ~/.npm
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+      - if: ${{ steps.cache-yarn.outputs.cache-hit != 'true' }}
+        name: List the state of node modules
+        continue-on-error: true
+        run: npm list   
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
       - run: cd frontend && npm ci      

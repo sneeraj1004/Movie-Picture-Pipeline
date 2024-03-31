@@ -1,5 +1,5 @@
 # Workflow name
-name: Backend Continuous Integration
+name: Backend Continuous Deployment
 
 # Triggers for the workflow
 on:      
@@ -67,11 +67,41 @@ jobs:
     defaults:
       run:
         working-directory: ./backend
+    env:        
+        AWS_REGION: us-east-1
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3    
-    - 
-      name: Docker build
+    - name: Checkout Code
+      uses: actions/checkout@v3
+      
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    - name: Login to Amazon 
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build and Push Docker Image
+      working-directory: ./backend
+      env:
+        IMAGE_TAG: latest
+        REPO_NAME: backend
       run: |
-        docker build -t mp-backend:latest .
-        
+        docker build --build-arg=REACT_APP_MOVIE_API_URL=http://localhost:5000 --tag 666221279708.dkr.ecr.us-east-1.amazonaws.com/$REPO_NAME:$IMAGE_TAG .
+        docker push 666221279708.dkr.ecr.us-east-1.amazonaws.com/$REPO_NAME:$IMAGE_TAG
+    
+    - name: Configure Kubeconfig
+      run:
+       aws eks update-kubeconfig --name udacity-project4-cluster --region us-east-1
+
+
+    - name: Deploy Docker Image to Amazon EKS
+      working-directory: ./backend/k8s
+      env:
+        IMAGE_TAG: latest
+        REPO_NAME: backend
+      run: |
+          kustomize edit set image backend=666221279708.dkr.ecr.us-east-1.amazonaws.com/$REPO_NAME:$IMAGE_TAG
+          kustomize build | kubectl apply -f -

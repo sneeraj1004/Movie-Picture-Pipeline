@@ -1,5 +1,5 @@
 # Workflow name
-name: Frontend-Continuous-Integration
+name: Frontend Continuous Integration
 
 # Triggers for the workflow
 on:
@@ -125,4 +125,5 @@ jobs:
         npm test
     - name: Docker Build
       run: 
-        docker build -t mp-frontend:latest . --build-arg REACT_APP_MOVIE_API_URL="reactMovieURL"
+        docker build -t mp-frontend:latest . --build-arg REACT_APP_MOVIE_API_URL=http://localhost:5000
+        docker run --name mp-frontend -p 3000:3000 -d mp-frontend

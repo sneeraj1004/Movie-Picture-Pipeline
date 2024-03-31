@@ -70,8 +70,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3    
-    - 
-      name: Docker build
+    
+    - name: Docker build
       run: |
         docker build -t mp-backend:latest .
         
